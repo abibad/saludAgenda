@@ -1,151 +1,215 @@
-// === CitasManager: Manejo de citas médicas ===
-const CitasManager = {
-    citas: [],
-    
-    // Inicializar
-    init() {
-        this.cargarCitas();
-        this.setupEventListeners();
-        this.mostrarCitas();
-    },
+        // Variables globales
+        let selectedSpecialty = '';
+        let editingCitaId = null;
 
-    // Cargar citas desde localStorage
-    cargarCitas() {
-        this.citas = JSON.parse(localStorage.getItem("citas")) || [];
-    },
+        // Manejo de tabs
+        function openTab(evt, tabName) {
+            document.querySelectorAll(".tabcontent").forEach(tc => {
+                tc.classList.remove("active");
+                tc.style.display = "none";
+            });
+            document.querySelectorAll(".tab-btn").forEach(btn => btn.classList.remove("active"));
+            
+            document.getElementById(tabName).style.display = "block";
+            document.getElementById(tabName).classList.add("active");
+            evt.currentTarget.classList.add("active");
+        }
 
-    // Guardar citas en localStorage
-    guardarCitas() {
-        localStorage.setItem("citas", JSON.stringify(this.citas));
-    },
-
-    // Configurar event listeners
-    setupEventListeners() {
-        document.getElementById("filtroEspecialidad").addEventListener("change", () => this.mostrarCitas());
-        document.getElementById("filtroDesde").addEventListener("change", () => this.mostrarCitas());
-        document.getElementById("filtroHasta").addEventListener("change", () => this.mostrarCitas());
-    },
-
-    // Obtener clase de badge según estado
-    getBadgeClass(estado) {
-        const badges = {
-            'Programada': 'bg-primary',
-            'Confirmada': 'bg-success',
-            'Cancelada': 'bg-danger'
-        };
-        return badges[estado] || 'bg-primary';
-    },
-
-    // Formatear fecha
-    formatearFecha(fecha) {
-        return new Date(fecha).toLocaleDateString('es-ES');
-    },
-
-    // Mostrar citas en la tabla
-    mostrarCitas() {
-        const filtroEsp = document.getElementById("filtroEspecialidad").value;
-        const filtroDesde = document.getElementById("filtroDesde").value;
-        const filtroHasta = document.getElementById("filtroHasta").value;
-
-        const citasFiltradas = this.citas.filter(cita => {
-            if (filtroEsp && cita.especialidad !== filtroEsp) return false;
-            if (filtroDesde && cita.fecha < filtroDesde) return false;
-            if (filtroHasta && cita.fecha > filtroHasta) return false;
-            return true;
+        // Manejo de selección de especialidades
+        document.querySelectorAll('.specialty-card').forEach(card => {
+            card.addEventListener('click', function() {
+                // Remover selección previa
+                document.querySelectorAll('.specialty-card').forEach(c => c.classList.remove('selected'));
+                
+                // Seleccionar nueva especialidad
+                this.classList.add('selected');
+                selectedSpecialty = this.dataset.specialty;
+                document.getElementById('especialidadSelect').value = selectedSpecialty;
+                document.getElementById('especialidadError').style.display = 'none';
+            });
         });
 
-        const tbody = document.getElementById("tablaCitas");
-        tbody.innerHTML = citasFiltradas.map((cita, index) => `
-            <tr>
-                <td>${index + 1}</td>
-                <td>${cita.nombre}</td>
-                <td>${cita.especialidad}</td>
-                <td>${this.formatearFecha(cita.fecha)}</td>
-                <td>${cita.hora}</td>
-                <td>
-                    <span class="badge ${this.getBadgeClass(cita.estado)}">
-                        ${cita.estado || 'Programada'}
-                    </span>
-                </td>
-                <td>
-                    <button class="btn btn-warning btn-sm" onclick="CitasManager.editarCita(${index})">
-                        <i class="fas fa-edit me-1"></i>Editar
-                    </button>
-                    <button class="btn btn-info btn-sm mx-1" onclick="CitasManager.cambiarEstado(${index})">
-                        <i class="fas fa-sync-alt me-1"></i>Estado
-                    </button>
-                    <button class="btn btn-danger btn-sm" onclick="CitasManager.eliminarCita(${index})">
-                        <i class="fas fa-trash-alt me-1"></i>Eliminar
-                    </button>
-                </td>
-            </tr>
-        `).join('');
-    },
+        // Validación y envío del formulario de cita
+        document.getElementById("formCita").addEventListener("submit", function(e) {
+            e.preventDefault();
+            
+            // Validar especialidad seleccionada
+            if (!selectedSpecialty) {
+                document.getElementById('especialidadError').style.display = 'block';
+                document.querySelector('.specialty-grid').scrollIntoView({ behavior: 'smooth' });
+                return;
+            }
+            
+            const cita = {
+                id: Date.now(),
+                nombre: document.getElementById("nombre").value.trim(),
+                correo: document.getElementById("correo").value.trim(),
+                telefono: document.getElementById("telefono").value.trim(),
+                especialidad: selectedSpecialty,
+                fecha: document.getElementById("fecha").value,
+                motivo: document.getElementById("motivo").value.trim(),
+                estatus: "Activa"
+            };
 
-    // Editar cita
-    editarCita(index) {
-        const cita = this.citas[index];
-        const nuevaFecha = prompt("Ingrese nueva fecha (YYYY-MM-DD):", cita.fecha);
-        const nuevaHora = prompt("Ingrese nueva hora (HH:MM):", cita.hora);
-        
-        if (nuevaFecha && nuevaHora) {
-            this.citas[index] = { ...cita, fecha: nuevaFecha, hora: nuevaHora };
-            this.guardarCitas();
-            this.mostrarCitas();
-        }
-    },
+            if (new Date(cita.fecha) < new Date()) {
+                alert("⚠️ La fecha y hora no pueden ser pasadas.");
+                return;
+            }
 
-    // Cambiar estado de la cita
-    cambiarEstado(index) {
-        const estados = ['Programada', 'Confirmada', 'Cancelada'];
-        const estadoActual = this.citas[index].estado || 'Programada';
-        const nuevoEstado = prompt(
-            `Estado actual: ${estadoActual}\nNuevo estado (${estados.join(', ')}):`,
-            estadoActual
-        );
-
-        if (nuevoEstado && estados.includes(nuevoEstado)) {
-            this.citas[index].estado = nuevoEstado;
-            this.guardarCitas();
-            this.mostrarCitas();
-        }
-    },
-
-    // Eliminar cita
-    eliminarCita(index) {
-        if (confirm("¿Está seguro que desea eliminar esta cita?")) {
-            this.citas.splice(index, 1);
-            this.guardarCitas();
-            this.mostrarCitas();
-        }
-    },
-
-    // Exportar a TXT
-    exportarTXT() {
-        let contenido = "LISTADO DE CITAS\n";
-        contenido += "================\n\n";
-        
-        this.citas.forEach((cita, index) => {
-            contenido += `Cita #${index + 1}\n`;
-            contenido += `Paciente: ${cita.nombre}\n`;
-            contenido += `Especialidad: ${cita.especialidad}\n`;
-            contenido += `Fecha: ${this.formatearFecha(cita.fecha)}\n`;
-            contenido += `Hora: ${cita.hora}\n`;
-            contenido += `Estado: ${cita.estado || "Programada"}\n`;
-            contenido += "================\n\n";
+            let citas = JSON.parse(localStorage.getItem("citas")) || [];
+            citas.push(cita);
+            localStorage.setItem("citas", JSON.stringify(citas));
+            
+            // Mostrar mensaje de éxito con animación
+            const btn = e.target.querySelector('button[type="submit"]');
+            const originalContent = btn.innerHTML;
+            btn.innerHTML = '<i class="bi bi-check-circle-fill"></i> ¡Guardado!';
+            btn.style.background = 'linear-gradient(135deg, #4facfe 0%, #00f2fe 100%)';
+            
+            setTimeout(() => {
+                btn.innerHTML = originalContent;
+                btn.style.background = '';
+                alert("✅ Cita guardada con éxito. Folio: " + cita.id);
+                e.target.reset();
+                selectedSpecialty = '';
+                document.querySelectorAll('.specialty-card').forEach(c => c.classList.remove('selected'));
+            }, 1500);
         });
 
-        const blob = new Blob([contenido], { type: "text/plain" });
-        const url = URL.createObjectURL(blob);
-        const a = document.createElement("a");
-        a.href = url;
-        a.download = "citas.txt";
-        document.body.appendChild(a);
-        a.click();
-        document.body.removeChild(a);
-        URL.revokeObjectURL(url);
-    }
-};
+        // Consultar citas
+        document.getElementById("formConsultar").addEventListener("submit", function(e) {
+            e.preventDefault();
+            const folio = document.getElementById("consultaFolio").value.trim();
+            const correo = document.getElementById("consultaCorreo").value.trim();
 
-// Inicializar cuando el DOM esté listo
-document.addEventListener('DOMContentLoaded', () => CitasManager.init());
+            let citas = JSON.parse(localStorage.getItem("citas")) || [];
+            let filtradas = citas.filter(c => (folio ? c.id == folio : true) && c.correo === correo);
+
+            const resultado = document.getElementById("resultadoCitas");
+            resultado.innerHTML = "";
+
+            if (filtradas.length === 0) {
+                resultado.innerHTML = `
+                    <div class="text-center py-4">
+                        <i class="bi bi-search" style="font-size: 3rem; color: #6c757d;"></i>
+                        <p class="text-muted mt-2">No se encontraron citas con los criterios especificados.</p>
+                    </div>
+                `;
+                return;
+            }
+
+            const citasHtml = filtradas.map(cita => `
+                <div class="cita-card">
+                    <div class="d-flex justify-content-between align-items-start mb-3">
+                        <div>
+                            <h5><i class="bi bi-ticket-detailed"></i> Folio: ${cita.id}</h5>
+                            <span class="status-badge ${cita.estatus === 'Activa' ? 'status-activa' : 'status-cancelada'}">
+                                ${cita.estatus}
+                            </span>
+                        </div>
+                        <div class="specialty-icon" style="font-size: 2rem;">
+                            ${getSpecialtyIcon(cita.especialidad)}
+                        </div>
+                    </div>
+                    
+                    <div class="row">
+                        <div class="col-md-6">
+                            <p><strong><i class="bi bi-hospital"></i> Especialidad:</strong> ${cita.especialidad}</p>
+                            <p><strong><i class="bi bi-calendar-date"></i> Fecha:</strong> ${formatDate(cita.fecha)}</p>
+                        </div>
+                        <div class="col-md-6">
+                            <p><strong><i class="bi bi-person"></i> Nombre:</strong> ${cita.nombre}</p>
+                            <p><strong><i class="bi bi-telephone"></i> Teléfono:</strong> ${cita.telefono}</p>
+                        </div>
+                    </div>
+                    
+                    <p><strong><i class="bi bi-chat-square-text"></i> Motivo:</strong> ${cita.motivo}</p>
+                    
+                    <div class="mt-3">
+                        ${cita.estatus === 'Activa' ? `
+                            <button class="btn btn-warning btn-sm me-2" onclick="modificarCita(${cita.id})">
+                                <i class="bi bi-pencil"></i> Modificar
+                            </button>
+                            <button class="btn btn-danger btn-sm" onclick="cancelarCita(${cita.id})">
+                                <i class="bi bi-x-circle"></i> Cancelar
+                            </button>
+                        ` : ''}
+                    </div>
+                </div>
+            `).join('');
+
+            resultado.innerHTML = citasHtml;
+        });
+
+        // Funciones auxiliares
+        function getSpecialtyIcon(specialty) {
+            const icons = {
+                'Pediatría': '<i class="bi bi-person-hearts"></i>',
+                'Ginecología': '<i class="bi bi-gender-female"></i>',
+                'Odontología': '<i class="bi bi-emoji-smile"></i>',
+                'Cardiología': '<i class="bi bi-heart-pulse"></i>'
+            };
+            return icons[specialty] || '<i class="bi bi-hospital"></i>';
+        }
+
+        function formatDate(dateString) {
+            const date = new Date(dateString);
+            return date.toLocaleString('es-MX', {
+                year: 'numeric',
+                month: 'long',
+                day: 'numeric',
+                hour: '2-digit',
+                minute: '2-digit'
+            });
+        }
+
+        // Cancelar cita
+        function cancelarCita(id) {
+            if (confirm('¿Está seguro de que desea cancelar esta cita?')) {
+                let citas = JSON.parse(localStorage.getItem("citas")) || [];
+                citas = citas.map(c => c.id === id ? {...c, estatus: "Cancelada"} : c);
+                localStorage.setItem("citas", JSON.stringify(citas));
+                alert("✅ Cita cancelada exitosamente.");
+                document.getElementById("formConsultar").dispatchEvent(new Event("submit"));
+            }
+        }
+
+        // Modificar cita
+        function modificarCita(id) {
+            let citas = JSON.parse(localStorage.getItem("citas")) || [];
+            const cita = citas.find(c => c.id === id);
+            if (!cita) return;
+
+            // Cambiar a tab de generar
+            openTab({currentTarget: document.querySelectorAll(".tab-btn")[1]}, "generar");
+            
+            // Llenar el formulario
+            document.getElementById("nombre").value = cita.nombre;
+            document.getElementById("correo").value = cita.correo;
+            document.getElementById("telefono").value = cita.telefono;
+            document.getElementById("fecha").value = cita.fecha;
+            document.getElementById("motivo").value = cita.motivo;
+
+            // Seleccionar especialidad
+            selectedSpecialty = cita.especialidad;
+            document.getElementById('especialidadSelect').value = selectedSpecialty;
+            document.querySelectorAll('.specialty-card').forEach(card => {
+                card.classList.remove('selected');
+                if (card.dataset.specialty === cita.especialidad) {
+                    card.classList.add('selected');
+                }
+            });
+
+            // Eliminar la cita antigua
+            citas = citas.filter(c => c.id !== id);
+            localStorage.setItem("citas", JSON.stringify(citas));
+            
+            alert("📝 Cita cargada para modificación. Realice los cambios necesarios y guarde.");
+        }
+
+        // Establecer fecha mínima como ahora
+        document.addEventListener('DOMContentLoaded', function() {
+            const now = new Date();
+            now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+            document.getElementById('fecha').min = now.toISOString().slice(0, 16);
+        });
